@@ -1,0 +1,84 @@
+﻿body {
+    min-width: 330px;
+}
+
+.wrap-background-body {
+    /*background-image: url(../image/gaosiback.jpg);
+    background-size: 100% 100%;
+    -moz-background-size: 100% 100%;
+    background-repeat: no-repeat;*/
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    overflow:hidden;
+}
+
+.check-code-image {
+    cursor: pointer;
+    /*-moz-border-radius-topright: 5px;
+    -webkit-border-top-right-radius: 5px;
+    -moz-border-radius-topright: 5px;
+    -moz-border-radius-bottomright: 5px;
+    -webkit-border-bottom-right-radius: 5px;
+    -moz-border-radius-bottomright: 5px;*/
+}
+
+.wrap-content-panel {
+}
+
+    .wrap-content-panel form label {
+        color: rgb(159,159,159);
+    }
+
+    .wrap-content-panel div.row {
+        background-color: rgb(255,255,255);
+    }
+
+.title-panel {
+    width: 320px;
+    border-bottom: solid 1px rgb(195,195,195);
+    padding: 10px 0px;
+    font-size: 20px;
+    color: rgb(159,159,159);
+    min-width: 280px;
+}
+
+.link-button-panel-bottom {
+    color: rgb(255,255,255);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+    .link-button-panel-bottom:hover {
+        color: #31b0d5;
+    }
+
+#wrap_ForgetPWD_Panel, #wrap_SignUp_Panel form label {
+    font-size: 14px;
+}
+
+.form-group {
+    margin-bottom: 0px;
+}
+
+label {
+    margin-bottom: 0rem;
+    padding-top: 0.2rem;
+}
+
+.send-note-code-btn {
+    width: 90px;
+    padding: 8px;
+    cursor: pointer;
+    background-color: rgb(139,195,74);
+    color: rgb(255,255,255);
+    font-size: 14px;
+}
+
+#linkBtn_Agree_Agreement span {
+    color: #31b0d5;
+    cursor: pointer;
+}
