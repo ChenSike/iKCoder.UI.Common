@@ -290,10 +290,11 @@
     <link rel="stylesheet" href="style/bootstrap-switch.min.css">
     <link rel="stylesheet" href="style/common.bak.css">
     <link rel="stylesheet" href="style/profile.css">
-    <script src="javascript/common/jquery-3.2.1.min.js"></script>
+    <script src="javascript/common/jquery-3.2.1.js"></script>
     <script src="javascript/common/fontawesome-all.min.js"></script>
     <script src="javascript/common/tether.min.js"></script>
     <script src="javascript/common/bootstrap.js"></script>
+    <script src="javascript/common/bootstrap.bundle.min.js"></script>
     <script src="javascript/common/bootstrap-suggest.min.js"></script>
     <script src="javascript/common/bootstrap-switch.min.js"></script>
     <script src="javascript/common/global.js"></script>
@@ -326,7 +327,7 @@
                                             <li class="nav-item">
                                                 <div class="btn-group" data-toggle="buttons">
                                                     <button class="btn btn-primary btn-sm btn-mood-first">
-                                                        <!--<span class="fa-stack">                                                            
+                                                        <!--<span class="fa-stack">
                                                             <i class="fas fa-expand fa-spin fa-stack-2x fa-fw"></i>
                                                             <i class="fas fa-heartbeat fa-stack-1x"></i>
                                                         </span>-->
@@ -533,6 +534,26 @@
                     <div class="container">
                         <div class="row">
                             <div class="col">
+                                <form class="form-inline">
+                                    <div class="input-group w-100">
+                                        <input type="text" class="form-control form-control-sm" id="txt_Circle_AddFriend_Search" placeholder="搜索用户、讨论组和频道">
+                                        <div class="input-group-prepend btn-circle-addfriend-search">
+                                            <div class="input-group-text"><i class="fas fa-search"></i></div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div>
+                        <div class="row">
+                            <div class="col col-result-title">
+                                搜索结果：
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col col-result-container">
+                                <div class="container container-fluid container-result">
+                                </div>
                             </div>
                         </div>
                     </div>
