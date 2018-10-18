@@ -59,7 +59,17 @@ var _gCourseTypeMap = {
     a: { icon: 'fas fa-brain', title: 'AI' },
     //a: { icon: 'fas fa-code-branch', title: 'AI' },
     b: { icon: 'fab fa-bimobject', title: 'BBBB' },
-    d: { icon: 'fas fa-database', title: 'Database' }
+    d: { icon: 'fas fa-database', title: 'Database' },
+    m: { icon: 'fab fa-meetup', title: 'MMMM' },
+};
+var _gCourseImgMap = {
+    A: { img: 'image/course/course_logic.png', color: 'rgb(86,181,34)' },
+    B: { img: 'image/course/course_html.png', color: 'rgb(100,124,185)' },
+    C: { img: 'image/course/course_js.png', color: 'rgb(86,181,34)' },
+    D: { img: 'image/course/course_python.png', color: 'rgb(100,124,185)' },
+    E: { img: 'image/course/course_cs.png', color: 'rgb(86,181,34)' },
+    F: { img: 'image/course/course_java.png', color: 'rgb(100,124,185)' },
+    G: { img: 'image/course/course_ios.png', color: 'rgb(86,181,34)' }
 };
 var _gSTEAMMap = {
     s: { icon: 'js-square', title: 'Science' },
@@ -71,21 +81,11 @@ var _gSTEAMMap = {
 var _gEmojiGroups = [];
 var _gCurrentEmojiGroup = null;
 var _gSocket = null;
-var _gToken = '';
 var _orgAvailableHeight = 890;
 var _gUserInfoObj = { userName: '', header: '', userId: '', nickName: '', level: '', birthday: '', country: '', gender: '', province: '', city: '', school: '' };
-var _gCirleMessages = {};
 var _circleDataSearch = { value: [] };
-var _gCiecleUsers = [];
-var _gCourseImgMap = {
-    A: { img: 'image/course/course_logic.png', color: 'rgb(86,181,34)' },
-    B: { img: 'image/course/course_html.png', color: 'rgb(100,124,185)' },
-    C: { img: 'image/course/course_js.png', color: 'rgb(86,181,34)' },
-    D: { img: 'image/course/course_python.png', color: 'rgb(100,124,185)' },
-    E: { img: 'image/course/course_cs.png', color: 'rgb(86,181,34)' },
-    F: { img: 'image/course/course_java.png', color: 'rgb(100,124,185)' },
-    G: { img: 'image/course/course_ios.png', color: 'rgb(86,181,34)' }
-};
+var _gCircleChats = [];
+var _gCircleUsers = [];
 var _gCircleGroups = [];
 var _gCurrentChatter = { id: '', type: '' };
 
@@ -95,6 +95,7 @@ function initPage() {
     buildCategorys();
     initEvents();
     initData();
+    circleInitUserList();
 };
 
 function initEvents() {
@@ -322,7 +323,7 @@ function buildCategoryContent(categoryId) {
                 }
             };
 
-            ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getcoursepackage, {}), '', successFn);
+            ajaxFn('GET', _getRequestURL(_gURLMapping.course.getcoursepackage, {}), '', successFn);
             break;
         case 'experiment':
             successFn = function (response) {
@@ -334,10 +335,11 @@ function buildCategoryContent(categoryId) {
                 }
             };
 
-            ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getcoursepackage, {}), '', successFn);
+            ajaxFn('GET', _getRequestURL(_gURLMapping.course.getcoursepackage, {}), '', successFn);
             break;
         case 'circle':
             buildContent_Circle();
+            webSocketSend('Action_Get_DialogList', '', '', [], {}, []);
             break;
         case 'report':
             buildContent_Report();
@@ -358,6 +360,7 @@ function buildCategoryContent(categoryId) {
 };
 
 function buildContent_Courses(items) {
+    var courseObjs = [];
     var orgContainerHeight = 235;
     var orgHeight = 225;
     var orgWidth = 155;
@@ -386,7 +389,10 @@ function buildContent_Courses(items) {
             isfree: tmpItem.attr('isfress'),
             discount: tmpItem.attr('discount'),
             access: tmpItem.attr('access'),
-            enable: tmpItem.attr('enable')
+            enable: tmpItem.attr('enable'),
+            diff: tmpItem.attr('diff'),
+            des: tmpItem.attr('des'),
+            type: tmpItem.attr('udma'),
         });
     }
 
@@ -418,7 +424,7 @@ function buildContent_Courses(items) {
         itemsHTML.push('                   <p class="text-center" style="' + tmpStyle + '">' + datas[i].course + '</p>');
         itemsHTML.push('                </div>');
         itemsHTML.push('            </div>');
-        if (datas[i].enable == '1') {
+        if (datas[i].enable == '0') {
             itemsHTML.push('            <div class="row no-margin">');
             itemsHTML.push('                <div class="col no-padding text-12">');
             itemsHTML.push('                    <p class="text-center" style="' + tmpStyle + '">即将上线</p>');
@@ -435,6 +441,8 @@ function buildContent_Courses(items) {
                 } else {
                     tmpBtn = '<button type="button" class="btn btn-sm btn-warning btn-course-item-buy" data-target="' + datas[i].name + '" title="购买课程"><i class="fas fa-shopping-cart "></i></button>';
                 }
+            } else {
+                tmpBtn = '<button type="button" class="btn btn-sm btn-warning btn-course-item-buy" data-target="' + datas[i].name + '" title="课程详情"><i class="fas fa-info-circle"></i></button>';
             }
 
             itemsHTML.push('                    <p class="text-center" style="' + tmpStyle + '">价格: ');
@@ -465,50 +473,42 @@ function buildContent_Courses(items) {
     tmpHTMLArr.push('</div>');
     $('.col-main-content').append($(tmpHTMLArr.join('')));
     $('.img-course-item-detail').on('click', function (eventObj) {
-        ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getlessonslist, { course_name: $(eventObj.currentTarget).attr('data-target') }), '', buildDetail_Course);
+        ajaxFn('GET', _getRequestURL(_gURLMapping.course.getlessonslist, { course_name: $(eventObj.currentTarget).attr('data-target') }), '', buildDetail_Course);
     });
-    $('.btn-course-item-buy').on('click', showCourseBuyModal);
+    $('.btn-course-item-buy').on('click', function (eventObj) {
+        var courseName = $(eventObj.currentTarget).attr('data-target');
+        var currCourse = null;
+        for (var i = 0; i < datas.length; i++) {
+            if (courseName == datas[i].name) {
+                currCourse = datas[i];
+                break;
+            }
+        }
+        var successFn = function (response) {
+            showCourseBuyModal(response, currCourse);
+        }
+
+        ajaxFn('GET', _getRequestURL(_gURLMapping.course.getlessonslist, { course_name: courseName }), '', successFn);
+    });
 
     bindHorizontalListEvent(containerHeight, width, space, itemCount, 'course_package');
-    ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getlessonslist, { course_name: datas[0].name }), '', buildDetail_Course);
+    ajaxFn('GET', _getRequestURL(_gURLMapping.course.getlessonslist, { course_name: datas[0].name }), '', buildDetail_Course);
 };
 
-function showCourseBuyModal(eventObj) {
-    var courseId = $(eventObj.currentTarget).attr('data-target');
-    var data = {
-        course: "逻辑课程",
-        discount: "2",
-        id: "1",
-        isfree: "0",
-        name: "A",
-        price: "1000",
-        access: '0',
-        enable: '1',
-        detail: 'Cards include a few options for working with images. Choose from appending “image caps” at either end of a card, overlaying images with card content, or simply embedding the image in a card.',
-        lessons: [
-            {
-                title: "模式识别", symbol: "A_001", steam: "S", type: "UA", steps: "4"
-            }, {
-                title: "路径跟随", symbol: "A_002", steam: "S", type: "UDA", steps: "4"
-            }, {
-                title: "顺序", symbol: "A_003", steam: "S", type: "UA", steps: "4"
-            }, {
-                title: "条件逻辑", symbol: "A_004", steam: "ST", type: "DA", steps: "4"
-            }, {
-                title: "逻辑判断", symbol: "A_005", steam: "ST", type: "UA", steps: "4"
-            }, {
-                title: "应用高级逻辑判断", symbol: "A_006", steam: "S", type: "UA", steps: "4"
-            }, {
-                title: "应用否定逻辑", symbol: "A_007", steam: "S", type: "DA", steps: "4"
-            }, {
-                title: "练习", symbol: "A_008", steam: "S", type: "DA", steps: "4"
-            }, {
-                title: "条件循环", symbol: "A_009", steam: "T", type: "DA", steps: "4"
-            }, {
-                title: "循环", symbol: "A_010", steam: "ST", type: "UA", steps: "4"
-            }
-        ]
-    };
+function showCourseBuyModal(response, course) {
+    var items = $(response).find('item');
+    var lessons = [];
+    var tmpItem;
+    for (var i = 0; i < items.length; i++) {
+        tmpItem = $(items[i]);
+        lessons.push({
+            title: tmpItem.attr('lesson_title'),
+            symbol: tmpItem.attr('lesson_code'),
+            steam: tmpItem.attr('steam'),
+            type: tmpItem.attr('udba'),
+            steps: tmpItem.attr('totalsteps')
+        });
+    }
 
     if ($('#modal_Course_Buy').length == 0) {
         var tmpHTMLStr = [];
@@ -571,7 +571,7 @@ function showCourseBuyModal(eventObj) {
         tmpHTMLStr.push('            </div>');
         tmpHTMLStr.push('            <div class="modal-footer">');
         tmpHTMLStr.push('                <button type="button" class="btn btn-outline-success btn-sm btn-course-buy-confirm">确定购买</button>');
-        tmpHTMLStr.push('                <button type="button" class="btn btn-outline-light btn-sm" data-dismiss="modal">关闭</button>');
+        tmpHTMLStr.push('                <button type="button" class="btn btn-outline-dark btn-sm" data-dismiss="modal">关闭</button>');
         tmpHTMLStr.push('            </div>');
         tmpHTMLStr.push('        </div>');
         tmpHTMLStr.push('    </div>');
@@ -580,15 +580,34 @@ function showCourseBuyModal(eventObj) {
         $('body').append($(tmpHTMLStr.join('')));
         $('#modal_Course_Buy .course-buy-card-header-tabs a').on('click', function (eventObj) {
             $(eventObj.currentTarget).tab('show');
-        })
-
+        });
         $('#modal_Course_Buy .course-buy-card-header-tabs a').on('shown.bs.tab', function (eventObj) {
             var container = $('#modal_Course_Buy .card .card-body');
             container.empty();
+            var tmpHTMLArr = [];
             if ($(eventObj.currentTarget).attr('data-target') == 'detail') {
-                container.text(data.detail);
+                tmpHTMLArr.push('<table class="table table-sm">');
+                tmpHTMLArr.push('   <thead>');
+                tmpHTMLArr.push('       <tr>');
+                tmpHTMLArr.push('           <th class="th-course-diff" scope="col">难度: ');
+                var diff = parseFloat(course.diff);
+                var tmpDiff = '';
+                for (var j = 0; j < 5; j++) {
+                    tmpDiff = (diff > j ? diff < j + 1 ? 'fas fa-star-half-alt' : 'fas fa-star' : 'far fa-star');
+                    tmpHTMLArr.push('<i class="' + tmpDiff + '"></i>');
+                }
+
+                tmpHTMLArr.push('           </th>');
+                tmpHTMLArr.push('           <th scope="col">相关技术: ' + buildCourseTypeHTML(course.type) + '</th>');
+                tmpHTMLArr.push('       </tr>');
+                tmpHTMLArr.push('   </thead>');
+                tmpHTMLArr.push('   <tbody>');
+                tmpHTMLArr.push('       <tr>');
+                tmpHTMLArr.push('           <td colspan="2">' + course.des + '</td>');
+                tmpHTMLArr.push('       </tr>');
+                tmpHTMLArr.push('   </tbody>');
+                tmpHTMLArr.push('</table>');
             } else {
-                var tmpHTMLArr = [];
                 tmpHTMLArr.push('<table class="table table-hover table-sm">');
                 tmpHTMLArr.push('   <thead>');
                 tmpHTMLArr.push('       <tr>');
@@ -599,28 +618,32 @@ function showCourseBuyModal(eventObj) {
                 tmpHTMLArr.push('       </tr>');
                 tmpHTMLArr.push('   </thead>');
                 tmpHTMLArr.push('   <tbody>');
-                for (var i = 0; i < data.lessons.length; i++) {
+                for (var i = 0; i < lessons.length; i++) {
                     tmpHTMLArr.push('       <tr>');
-                    tmpHTMLArr.push('           <td>' + data.lessons[i].title + '</td>');
-                    tmpHTMLArr.push('           <td><span class="course-step-total">' + data.lessons[i].steps + '</span></td>');
-                    tmpHTMLArr.push('           <td>' + buildSTEAMHTML(data.lessons[i].steam) + '</td>');
-                    tmpHTMLArr.push('           <td>' + buildCourseTypeHTML(data.lessons[i].type) + '</td>');
+                    tmpHTMLArr.push('           <td>' + lessons[i].title + '</td>');
+                    tmpHTMLArr.push('           <td><span class="course-step-total">' + lessons[i].steps + '</span></td>');
+                    tmpHTMLArr.push('           <td>' + buildSTEAMHTML(lessons[i].steam) + '</td>');
+                    tmpHTMLArr.push('           <td>' + buildCourseTypeHTML(lessons[i].type) + '</td>');
                     tmpHTMLArr.push('       </tr>');
                 }
 
                 tmpHTMLArr.push('   </tbody>');
                 tmpHTMLArr.push('</table>');
-                container.append($(tmpHTMLArr.join('')));
             }
-        })
+
+            container.append($(tmpHTMLArr.join('')));
+        });
+        $('#modal_Course_Buy').on('shown.bs.modal', function (eventObj) {
+            $('body').css('padding', '0px');
+        });
     }
 
-    $('#modal_Course_Buy .course-image').attr('src', _gCourseImgMap[data.name.trim()].img);
-    $('#modal_Course_Buy .course-name').text(data.course);
-    $('#modal_Course_Buy_Title').text(data.access == '1' ? '课程概览' : '购买课程');
-    var tmpPrice = parseInt(data.price);
-    if (data.enable == '1' && data.access != '1' && data.isfree != '1' && data.discount != '0') {
-        var tmpDiscount = 1 - parseFloat(data.discount) / 100;
+    $('#modal_Course_Buy .course-image').attr('src', _gCourseImgMap[course.name.trim()].img);
+    $('#modal_Course_Buy .course-name').text(course.course);
+    $('#modal_Course_Buy_Title').text(course.access == '1' ? '课程概览' : '购买课程');
+    var tmpPrice = parseInt(course.price);
+    if (course.enable == '1' && course.access != '1' && course.isfree != '1' && course.discount != '0') {
+        var tmpDiscount = 1 - parseFloat(course.discount) / 100;
         tmpDiscount = parseInt(tmpPrice * tmpDiscount);
         $('#modal_Course_Buy .course-price').text(tmpPrice.toFixed(2));
         $('#modal_Course_Buy .course-price').css('text-decoration', 'line-through');
@@ -630,8 +653,8 @@ function showCourseBuyModal(eventObj) {
         $('#modal_Course_Buy .course-price').css('text-decoration', 'none');
         $('#modal_Course_Buy .row-course-discount').hide();
         $('#modal_Course_Buy .course-discount').text('');
-        $('#modal_Course_Buy .course-price').text(data.enable != '1' ? '即将上线' : data.access == '1' ? '已经购买' : data.isfree == '1' ? '免费' : tmpPrice.toFixed(2));
-        if (data.access == '1' || data.enable != '1' || data.isfree == '1') {
+        $('#modal_Course_Buy .course-price').text(course.enable != '1' ? '即将上线' : course.isfree == '1' ? '免费' : course.access == '1' ? '已经购买' : tmpPrice.toFixed(2));
+        if (course.access == '1' || course.enable != '1' || course.isfree == '1') {
             $('#modal_Course_Buy .btn-course-buy-confirm').hide();
         }
     }
@@ -641,22 +664,20 @@ function showCourseBuyModal(eventObj) {
 };
 
 function buildDetail_Course(response) {
-    //<root itemcount="1">
-    //<row index="1" id="1" course_name="A" lesson_title="模式识别" isfree="1" lesson_code="A_01_001" steam="s" udba="l" totalsteps="4" exp="100"></row>
-    //</root>
-    var items = $(response).find('row');
+    var items = $(response).find('item');
     var datas = [];
     var currItem = null;
     for (var i = 0; i < items.length; i++) {
         currItem = $(items[i]);
         datas.push({
+            //<item lesson_title="认识计算机-A" lesson_code="A_001" steam="E" udba="UD" totalsteps="1" order="1" status="0"/>
             symbol: currItem.attr('lesson_code'),
             title: currItem.attr('lesson_title'),
             steps: currItem.attr('totalsteps'),
-            complete: typeof currItem.attr('complete') == 'undefined' ? '0' : currItem.attr('complete'),
             steam: currItem.attr('steam'),
             type: currItem.attr('udba'),
-            course: currItem.attr('course_name')
+            course: currItem.attr('course_name'),
+            status: currItem.attr('status')
         });
     }
 
@@ -678,15 +699,15 @@ function buildDetail_Course(response) {
 
     var tmpState;
     for (var i = 0; i < datas.length; i++) {
-        tmpState = (datas[i].complete == datas[i].steps ? 'star' : 'star-half-alt');
+        tmpState = (datas[i].status == '1' ? 'fas fa-star-half-alt' : datas[i].status == '2' ? 'fas fa-star' : 'far fa-star');
         tmpHTMLArr.push('       <tr>');
-        tmpHTMLArr.push('           <td class="text-center"><i class="fas fa-' + tmpState + ' course-state"></i></td>');
+        tmpHTMLArr.push('           <td class="text-center"><i class="' + tmpState + ' course-state" data-target="' + datas[i].status + '"></i></td>');
         tmpHTMLArr.push('           <td>' + datas[i].title + '</td>');
-        tmpHTMLArr.push('           <td><span class="course-step-complete">' + datas[i].complete + '</span>/<span class="course-step-total">' + datas[i].steps + '</span></td>');
+        tmpHTMLArr.push('           <td><span class="course-step-total">' + datas[i].steps + '</span></td>');
         tmpHTMLArr.push('           <td>' + buildSTEAMHTML(datas[i].steam) + '</td>');
         tmpHTMLArr.push('           <td>' + buildCourseTypeHTML(datas[i].type) + '</td>');
         tmpHTMLArr.push('           <td>');
-        tmpHTMLArr.push('               <button type="button" class="btn btn-link course-start" data-target="' + datas[i].symbol + '|' + datas[i].complete + '">');
+        tmpHTMLArr.push('               <button type="button" class="btn btn-link course-start" data-target="' + datas[i].symbol + '" data-title="' + datas[i].title + '">');
         tmpHTMLArr.push('                   <i class="far fa-hand-point-right cursor-hand"></i>');
         tmpHTMLArr.push('               </button>');
         tmpHTMLArr.push('           </td>');
@@ -700,8 +721,8 @@ function buildDetail_Course(response) {
     $('.row-courses-group-item-list').remove();
     $('.row-courses-group-list').after($(tmpHTMLArr.join('')));
     $('.row-courses-group-item-list .course-start').on('click', function (eventObj) {
-        var target = $(eventObj.currentTarget).attr('data-target').split('|');
-        window.open("workplatform.html?scene=" + target[0] + '&step=' + target[1]);
+        var target = $(eventObj.currentTarget);
+        window.open("workplatform.html?scene=" + target.attr('data-target') + '&step=0&title=' + target.attr('data-title'));
     });
 };
 
@@ -801,12 +822,16 @@ function buildContent_Exp(items) {
     tmpHTMLArr.push('    </div>');
     tmpHTMLArr.push('</div>');
     $('.col-main-content').append($(tmpHTMLArr.join('')));
+    var successFn = function (response) {
+        buildDetail_Exp(response);
+    };
+
     $('.horizontal-list-item').on('click', function (eventObj) {
-        ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getlessonslist, { course_name: $(eventObj.currentTarget).attr('data-target') }), '', buildDetail_Exp);
+        ajaxFn('GET', _getRequestURL(_gURLMapping.course.getexplist, { course_name: $(eventObj.currentTarget).attr('data-target') }), '', successFn);
     });
 
     bindHorizontalListEvent(containerHeight, width, space, itemCount, 'course_package');
-    ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getlessonslist, { course_name: datas[0].name }), '', buildDetail_Exp);
+    ajaxFn('GET', _getRequestURL(_gURLMapping.course.getexplist, { course_name: datas[0].name }), '', successFn);
 };
 
 function buildDetail_Exp(response) {
@@ -931,20 +956,43 @@ function showExperimentAttachs(data) {
     $('#modal_Experiment_Attachs').modal('show');
 };
 
-function buildContent_Circle() {
-    var successFn = function (reponsse) {
-        if (_getExcuted(reponsse)) {
-            buildContent_Circle_Do(reponsse);
-        } else {
-            _showGlobalMessage('获取朋友列表失败，请重试!', 'warning', 'alert_GetFriendList_Error');
+function circleInitChats(doc) {
+    _gCircleChats = [];
+    var items = doc.find('row');
+    var itemObj, exist;
+    for (var i = 0; i < items.length; i++) {
+        itemObj = $(items[i]);
+        exist = false;
+        for (var j = 0; j < _gCircleChats.length; j++) {
+            if (typeof _gCircleChats[j].chatId == itemObj.attr('symbol')) {
+                exist = true;
+                break;
+            }
         }
-    };
 
-    //ajaxFn('GET', _getRequestURL(_gURLMapping.circle.getfriends, {}), '', successFn);
-    buildContent_Circle_Do();
-}
+        if (!exist) {
+            _gCircleChats.push({
+                chatId: itemObj.attr('id'),
+                chatter: '',
+                type: '',
+                msgs: []
+            });
+        }
+    }
 
-function buildContent_Circle_Do(reponsse) {
+    if (_gCircleChats.length <= 0) {
+        _gCircleChats.push({
+            chatId: '-1',
+            chatter: '-1',
+            type: 'user',
+            msgs: []
+        })
+    }
+
+    circleBuildSection_Chat('-1', 'user');
+};
+
+function buildContent_Circle() {
     var tmpHTMLArr = [];
     tmpHTMLArr.push('<div class="container-fluid h-100 no-wrap">');
     tmpHTMLArr.push('   <div class="row h-100 no-wrap">');
@@ -961,24 +1009,16 @@ function buildContent_Circle_Do(reponsse) {
     //tmpHTMLArr.push('               <div class="row no-wrap" style="height: calc(100% - 42px);">');
     tmpHTMLArr.push('               <div class="row no-wrap" style="height: calc(100% - 42px);">');
     tmpHTMLArr.push('                   <div class="col no-wrap col-circle-itemlist-container">');
-    tmpHTMLArr.push(circleBuildFriendPart());
     tmpHTMLArr.push('                   </div>');
     tmpHTMLArr.push('               </div>');
     tmpHTMLArr.push('           </div>');
     tmpHTMLArr.push('       </div>');
     tmpHTMLArr.push('       <div class="col h-100 no-wrap col-circle-message-list">');
-    tmpHTMLArr.push(circleBuildMessagePart());
     tmpHTMLArr.push('       </div>');
     tmpHTMLArr.push('   </div>');
     tmpHTMLArr.push('</div>');
 
     $('.col-main-content').append($(tmpHTMLArr.join('')));
-    //resize message input row and history row height
-    var tmpObj = circleCalcMessageHeight(-1);
-    $(".col-circle-message-input").height(tmpObj.input);
-    $(".col-circle-message-history").height(tmpObj.history);
-    //load messages
-    webSocketGetCiecleHistory('-1');
     //init events
     initEvents_Circle();
 };
@@ -1024,16 +1064,16 @@ function circleBuildSearchPart() {
 function circleBuildFriendPart() {
     var tmpHTMLArr = [];
     tmpHTMLArr.push('<div class="container-fluid circle-user-list-group">');
-    for (var j = 0; j < _gCiecleUsers.length; j++) {
-        circleBuildFriendItem(tmpHTMLArr, _gCiecleUsers[j]);
+    for (var i = 0; i < _gCircleChats.length; i++) {
+        circleBuildFriendItem(tmpHTMLArr, circleGetUserObj(_gCircleChats[i].chatter, _gCircleChats[i].type), _gCircleChats[i].chatId);
     }
 
     tmpHTMLArr.push('</div>');
     return tmpHTMLArr.join('');
 };
 
-function circleBuildFriendItem(tmpHTMLArr, item) {
-    tmpHTMLArr.push('<div class="row row-circle-user-list-item" data-target="' + item.userId + '" data-type="' + item.type + '">');
+function circleBuildFriendItem(tmpHTMLArr, item, chatId) {
+    tmpHTMLArr.push('<div class="row row-circle-user-list-item" data-target="' + item.userId + '" data-type="' + item.type + '" data-chat="' + chatId + '">');
     tmpHTMLArr.push('   <div class="col-1 col-circle-user-list-item-header">');
     if (item.type == 'group') {
         var imgStyle = (item.items.length <= 4 ? 'width:15px;height:15px;' : '');
@@ -1226,7 +1266,7 @@ function circleUpdateMsgHistory(userSymbol, userType) {
     }
 
     var currUserObj = circleGetUserObj(userSymbol, userType);
-    var currHistory = _gCirleMessages[currUserId];
+    var currHistory = _gCircleChats[currUserId];
     if (!isCurrent) {
         $('.container-circle-message-history').empty();
         circleUpdateCurrentLabel(currUserId, currUserType);
@@ -1348,9 +1388,9 @@ function circleBuildMessageItem(content, type, userInfo) {
 
 function circleGetUserObj(userId, userType) {
     var tmpObj = null;
-    for (var i = 0; i < _gCiecleUsers.length; i++) {
-        if (_gCiecleUsers[i].userId == userId && _gCiecleUsers[i].type == userType) {
-            tmpObj = _gCiecleUsers[i];
+    for (var i = 0; i < _gCircleUsers.length; i++) {
+        if (_gCircleUsers[i].userId == userId && _gCircleUsers[i].type == userType) {
+            tmpObj = _gCircleUsers[i];
             break;
         }
     }
@@ -1413,8 +1453,6 @@ function initEvents_Circle() {
         if (!$(eventObj.currentTarget).hasClass('active')) {
             $('.btn-circle-stb-item').removeClass('active');
             $(eventObj.currentTarget).addClass('active');
-            $('.col-circle-itemlist-container').empty();
-            $('.col-circle-message-list').empty();
             switch (tmpSymbol) {
                 case 'address':
                     webSocketSend('Action_Get_RelationsList', '', '', [], {});
@@ -1432,8 +1470,6 @@ function initEvents_Circle() {
     $('#modalFindFriend .btn-circle-addfriend-search').on('click', function (eventObj) {
         webSocketSend('Action_Get_RelationsSearch', '', '', [], { value: $('#txt_Circle_AddFriend_Search').val() });
     });
-
-    initEvents_Circle_Chat();
 };
 
 function circleRefresh_SearchResult(doc) {
@@ -1637,11 +1673,11 @@ function initEvents_Circle_Chat() {
         if (!circleCheckEmptyInput()) {
             var msg = circleBuildMessageItem($('.circle-message-input-field').html(), 0, _gUserInfoObj);
             var tmpSymbol = $('.label-circle-message-history-user').attr('data-target');
-            if (typeof _gCirleMessages[tmpSymbol] == undefined || !$.isArray(_gCirleMessages[tmpSymbol])) {
-                _gCirleMessages[tmpSymbol] = [];
+            if (typeof _gCircleChats[tmpSymbol] == undefined || !$.isArray(_gCircleChats[tmpSymbol])) {
+                _gCircleChats[tmpSymbol] = [];
             }
 
-            _gCirleMessages[tmpSymbol].push(msg);
+            _gCircleChats[tmpSymbol].push(msg);
             webSocketSend('send', msg);
             circleUpdateMsgHistory();
         }
@@ -1749,7 +1785,7 @@ function circleBuildUserPop(eventObj) {
             $('.user-popover-wrap .btn-user-popover').on('click', circleClickUserPopBtn);
         }
 
-        if (current.accecpt == '1') {
+        if (current.accecpt) {
             $('.user-popover-wrap .btn-user-popover.btn-add-friend').hide();
             $('.user-popover-wrap .btn-user-popover.btn-share-friend').show();
             $('.user-popover-wrap .btn-user-popover.btn-send-msg').show();
@@ -1863,15 +1899,31 @@ function circleShowSBGroupMember(groupObj, maxCount) {
 };
 
 function circleBuildSection_Chat(id, type) {
+    $('.col-circle-itemlist-container').empty();
     $('.col-circle-itemlist-container').append($(circleBuildFriendPart()));
+    $('.col-circle-message-list').empty();
     $('.col-circle-message-list').append($(circleBuildMessagePart()));
+    //resize message input row and history row height
     var tmpObj = circleCalcMessageHeight(-1);
     $(".col-circle-message-input").height(tmpObj.input);
     $(".col-circle-message-history").height(tmpObj.history);
     //load messages
     var chatterId = (arguments.length == 2 ? id : _gCurrentChatter.id == '' ? '-1' : _gCurrentChatter.id);
     var chatterType = (arguments.length == 2 ? type : _gCurrentChatter.type == '' ? 'user' : _gCurrentChatter.type);
-    webSocketGetCiecleHistory(chatterId, chatterType);
+    var exist = false;
+    for (var i = 0; i < _gCircleChats.length; i++) {
+        if (_gCircleChats[i].chatter == chatterId) {
+            exist = true;
+            break;
+        }
+    }
+
+    if (exist) {
+        webSocketSend('Action_Get_DialogContent', '', '', [chatterId], {}, []);
+    } else {
+        webSocketSend('Action_Set_NewDialog', '', '', [chatterId], {}, []);
+    }
+
     initEvents_Circle_Chat();
 };
 
@@ -1893,11 +1945,11 @@ function circleBuildFriendPart_Address() {
         groupObj
     ];
     var tmpArr = [];
-    for (var i = 0; i < _gCiecleUsers.length; i++) {
-        if (_gCiecleUsers[i].type == 'user') {
-            tmpArr.push(_gCiecleUsers[i]);
-        } else if (_gCiecleUsers[i].type == 'group') {
-            groupObj.items.push(_gCiecleUsers[i]);
+    for (var i = 0; i < _gCircleUsers.length; i++) {
+        if (_gCircleUsers[i].type == 'user') {
+            tmpArr.push(_gCircleUsers[i]);
+        } else if (_gCircleUsers[i].type == 'group') {
+            groupObj.items.push(_gCircleUsers[i]);
         }
     }
 
@@ -1917,7 +1969,7 @@ function circleBuildFriendPart_Address() {
             tmpHTMLArr.push('       </div>');
             tmpHTMLArr.push('   </div>');
             for (var j = 0; j < _gCircleGroups[i].items.length; j++) {
-                circleBuildFriendItem(tmpHTMLArr, _gCircleGroups[i].items[j]);
+                circleBuildFriendItem(tmpHTMLArr, _gCircleGroups[i].items[j], '');
             }
 
             tmpHTMLArr.push('</div>');
@@ -2046,46 +2098,38 @@ function circleClickAddressItem(eventObj) {
     circleUpdateCurrentLabel(userId, currType);
 };
 
-function circleBuildNewFriendsList(doc) {
-    var items = doc.find('row');
-    var friends = [];
-    var itemObj = null;
-    for (var i = 0; i < items.length; i++) {
-        itemObj = $(items[i]);
-        if (itemObj.attr('puname') && itemObj.attr('suname')) {
-            friends.push(_gCiecleUsers[i]);
-        }
-    }
-
+function circleBuildNewFriendsList() {
     var container = $('.container-circle-message-history');
     var tmpHTMLArr = [];
-    for (var i = 0; i < friends.length; i++) {
-        tmpHTMLArr.push('<div class="row row-circle-address-new-friend-item">');
-        tmpHTMLArr.push('   <div class="col-1 col-new-friend-header">');
-        tmpHTMLArr.push('       <img class="img-fluid circle-address-new-friend-header" src="' + friends[i].header + '" data-target="' + friends[i].userId + '">');
-        tmpHTMLArr.push('   </div>');
-        tmpHTMLArr.push('   <div class="col col-new-friend-content">');
-        tmpHTMLArr.push('       <div class="container container-fluid">');
-        tmpHTMLArr.push('           <div class="row">');
-        tmpHTMLArr.push('               <div class="col">' + friends[i].userName + '</div>');
-        tmpHTMLArr.push('           </div>');
-        for (var j = 0; j < 2 && j < friends[i].msg.length; j++) {
+    for (var i = 0; i < _gCircleUsers.length; i++) {
+        if (typeof _gCircleUsers[i].isNew == 'boolean' && _gCircleUsers[i].isNew) {
+            tmpHTMLArr.push('<div class="row row-circle-address-new-friend-item">');
+            tmpHTMLArr.push('   <div class="col-1 col-new-friend-header">');
+            tmpHTMLArr.push('       <img class="img-fluid circle-address-new-friend-header" src="' + _gCircleUsers[i].header + '" data-target="' + _gCircleUsers[i].userId + '">');
+            tmpHTMLArr.push('   </div>');
+            tmpHTMLArr.push('   <div class="col col-new-friend-content">');
+            tmpHTMLArr.push('       <div class="container container-fluid">');
             tmpHTMLArr.push('           <div class="row">');
-            tmpHTMLArr.push('               <div class="col text-999999">' + friends[i].msg[j] + '</div>');
+            tmpHTMLArr.push('               <div class="col">' + _gCircleUsers[i].userName + '</div>');
             tmpHTMLArr.push('           </div>');
-        }
+            for (var j = 0; j < 2 && j < _gCircleUsers[i].msg.length; j++) {
+                tmpHTMLArr.push('           <div class="row">');
+                tmpHTMLArr.push('               <div class="col text-999999">' + _gCircleUsers[i].msg[j] + '</div>');
+                tmpHTMLArr.push('           </div>');
+            }
 
-        tmpHTMLArr.push('       </div>');
-        tmpHTMLArr.push('   </div>');
-        tmpHTMLArr.push('   <div class="col-1 d-flex align-items-center col-new-friend-accept">');
-        if (friends[i].accecpt == '1') {
-            tmpHTMLArr.push('已添加');
-        } else {
-            tmpHTMLArr.push('       <button type="button" class="btn btn-success btn-sm btn-new-friend-accept" data-target="' + friends[i].userId + '">接受</button>');
-        }
+            tmpHTMLArr.push('       </div>');
+            tmpHTMLArr.push('   </div>');
+            tmpHTMLArr.push('   <div class="col-1 d-flex align-items-center col-new-friend-accept">');
+            if (_gCircleUsers[i].accecpt) {
+                tmpHTMLArr.push('已添加');
+            } else {
+                tmpHTMLArr.push('       <button type="button" class="btn btn-success btn-sm btn-new-friend-accept" data-target="' + _gCircleUsers[i].userId + '">接受</button>');
+            }
 
-        tmpHTMLArr.push('   </div>');
-        tmpHTMLArr.push('</div>');
+            tmpHTMLArr.push('   </div>');
+            tmpHTMLArr.push('</div>');
+        }
     }
 
     container.empty();
@@ -2098,7 +2142,7 @@ function circleBuildNewFriendsList(doc) {
     $('.btn-new-friend-accept').on('click', function (eventObj) {
         var target = $(eventObj.currentTarget);
         var userObj = circleGetUserObj(target.attr('data-target'), 'user');
-        userObj.accecpt = '1';
+        userObj.accecpt = true;
         circleAcceptFriendRequest(userObj.userId);
         var parent = target.parent();
         parent.empty();
@@ -2202,8 +2246,7 @@ function circleBuildFriendDetail(userObj) {
         var listWrap = $('.row-circle-message-part-1');
         detailWrap.show();
         listWrap.hide();
-        var isNew = (userObj.accecpt == '1');
-        if (isNew) {
+        if (userObj.accecpt) {
             var currTxt = titleLab.text();
             titleLab.html('<i class="fas fa-arrow-left"></i>');
             titleLab.css('cursor', 'pointer');
@@ -2292,7 +2335,7 @@ function circleBuildFriendDetail(userObj) {
         $('.container-circle-friend-item-detail .col-circle-friend-item-detail-address').text(userObj.address);
         $('.container-circle-friend-item-detail .col-circle-friend-item-detail-symbol').text(userObj.userId);
 
-        if (isNew) {
+        if (!userObj.accecpt) {
             $('.container-circle-friend-item-detail .col-circle-friend-item-detail-talk').hide();
             $('.container-circle-friend-item-detail .col-circle-friend-item-detail-reply').show();
             $('.container-circle-friend-item-detail .col-circle-friend-item-detail-talk .btn-circle-friend-item-detail-talk').attr('data-target', '');
@@ -2309,8 +2352,6 @@ function circleBuildFriendDetail(userObj) {
 function circleSwitchToTalk(chatterId, chatterType) {
     $('.btn-circle-stb-item').removeClass('active');
     $('.btn-circle-stb-item[data-target="chat"]').addClass('active');
-    $('.col-circle-itemlist-container').empty();
-    $('.col-circle-message-list').empty();
     circleBuildSection_Chat(chatterId, chatterType);
     $('.row-circle-user-list-item').removeClass('active');
     $('.row-circle-user-list-item[data-target="' + chatterId + '"]').addClass('active');
@@ -2513,6 +2554,7 @@ function circleClickChannelPopBtn(eventObj) {
 function circleClickUserItem(currentTarget) {
     var tmpSymbol = currentTarget.attr('data-target');
     var tmpType = currentTarget.attr('data-type');
+    var tmpChatId = currentTarget.attr('data-chat');
     $('.row-circle-user-list-item').removeClass('active');
     currentTarget.addClass('active');
     //webSocketGetCiecleHistory(tmpSymbol);
@@ -2525,10 +2567,12 @@ function circleClickUserItem(currentTarget) {
     var symbolEl = $(currentTarget.find('.circle-user-list-item-msg')[0]);
     symbolEl.text('0');
     symbolEl.hide();
-    testswebSocketGetCiecleHistory(tmpSymbol, tmpType);
+    //act, iSymbol, iMsg, iTargets, iValue, iBatch
+    webSocketSend('Action_Get_DialogContent', tmpChatId, '', [], {}, []);
 };
 
 function circleDBClickUserItem(eventObj) {
+    return;
     var tmpSymbol = $(eventObj.currentTarget).attr('data-target');
     $('#modalCircleUserInfor').modal('show');
 };
@@ -2822,54 +2866,74 @@ function circleChangeEmojiGroup(eventObj) {
     $('.emoji-item').on('click', circleInsertEmoji);
 };
 
+function circleInitUserList() {
+    _gCircleUsers = [];
+    _gCircleUsers.push({
+        userName: '系统消息',
+        header: 'image/tmpheader.jpg',
+        userId: '-1',
+        "msg": '',
+        "accecpt": true,
+        "gender": '',
+        "address": '',
+        "comment": '系统消息和通知',
+        "note": '',
+        "type": 'user'
+    });
+};
+
 function circleUpdateUserList(doc, type) {
-    var tmpArr = [];
-    for (var i = 0; i < _gCiecleUsers.length; i++) {
-        if (_gCiecleUsers[i].type != type) {
-            tmpArr.push(_gCiecleUsers[i]);
-        }
-    }
-
-    _gCiecleUsers = tmpArr;
-    if (type == 'user') {
-        _gCiecleUsers.push({
-            userName: '系统消息',
-            header: 'image/tmpheader.jpg',
-            userId: '-1',
-            "msg": '',
-            "accecpt": 1,
-            "gender": '',
-            "address": '',
-            "comment": '系统消息和通知',
-            "note": '',
-            "type": 'user'
-        });
-    }
-
     var items = doc.find('row');
-    var itemObj = null;
+    var itemObj = null, userId, exist;
     for (var i = 0; i < items.length; i++) {
         itemObj = $(items[i]);
-        if (itemObj.attr('puname') && itemObj.attr('suname')) {
-            continue;
-        }
+        userId = typeof itemObj.attr('uid') == 'undefined' ? '' : itemObj.attr('uid');
+        if (userId != '') {
+            exist = false;
+            for (var j = 0; j < _gCircleUsers.length; j++) {
+                if (userId == _gCircleUsers[j].userId) {
+                    exist = true;
+                    circleUpdateUser_Item_User(itemObj, _gCircleUsers[j]);
+                }
+            }
 
-        var newUser = null;
-        if (type == 'group') {
-            newUser = circleInitUser_Item_Group(itemObj);
-        } else if (type == 'channel') {
-            newUser = circleInitUser_Item_Channel(itemObj);
-        } else {
-            newUser = circleInitUser_Item_User(itemObj);
+            if (!exist) {
+                circleCreateAddUser(itemObj, type);
+            }
         }
+    }
+};
 
-        _gCiecleUsers.push(newUser);
+function circleCreateAddUser(itemObj, type) {
+    var newUser = null;
+    if (type == 'group') {
+        newUser = circleInitUser_Item_Group(itemObj);
+    } else if (type == 'channel') {
+        newUser = circleInitUser_Item_Channel(itemObj);
+    } else {
+        newUser = circleInitUser_Item_User(itemObj);
     }
 
-    _circleDataSearch = { value: [] };
-    for (var i = 0; i < _gCiecleUsers.length; i++) {
-        _circleDataSearch.value.push(_gCiecleUsers[i]);
-    }
+    _gCircleUsers.push(newUser);
+};
+
+function circleCreateAddNewFriend(itemObj) {
+    var newUser = {
+        "userName": '',
+        "header": '',
+        "userId": itemObj.attr('puname'),
+        "msg": typeof itemObj.attr('msg') == 'undefined' ? '' : itemObj.attr('msg'),
+        "accecpt": itemObj.attr('accecpt') == '1' ? true : false,
+        "gender": '',
+        "address": '',
+        "comment": '',
+        "note": '',
+        "type": 'user',
+        "requestid": itemObj.attr('id'),
+        "isNew": true
+    };
+
+    _gCircleUsers.push(newUser);
 };
 
 function circleInitUser_Item_User(itemObj) {
@@ -2883,36 +2947,36 @@ function circleInitUser_Item_User(itemObj) {
         "header": itemObj.attr('header') == '' ? 'image/tmpheader.jpg' : itemObj.attr('header'),
         "userId": itemObj.attr('uid'),
         "msg": typeof itemObj.attr('msg') == 'undefined' ? '' : itemObj.attr('msg'),
-        "accecpt": itemObj.attr('accecpt') == '1' ? '1' : '0',
+        "accecpt": typeof itemObj.attr('accecpt') == 'undefined' ? true : itemObj.attr('accecpt') == '1' ? true : false,
         "gender": itemObj.attr('sex') == '1' ? '1' : '0',
         "address": address.join(' '),
         "comment": typeof itemObj.attr('comment') == 'undefined' ? '' : itemObj.attr('comment'),
         "note": typeof itemObj.attr('note') == 'undefined' ? '' : itemObj.attr('note'),
-        "type": 'user'
+        "type": 'user',
+        "requestid": ''
     };
 
     return newUser;
 };
 
-function circleInitUser_Item_NewFriend(itemObj) {
-    var puName = itemObj.attr('puname');
-    var suName = itemObj.attr('suname');
-    var userName = (puName == _gUserInfoObj.userId ? suName : puName);
-    var newUser = {
-        "userName": userName,
-        "header": itemObj.attr('header') == '' ? 'image/tmpheader.jpg' : itemObj.attr('header'),
-        "userId": itemObj.attr('uid'),
-        "msg": itemObj.attr('msg') == '' ? '' : itemObj.attr('msg'),
-        "accecpt": itemObj.attr('accecpt') == '1' ? '1' : '0',
-        "gender": itemObj.attr('sex') == '1' ? '1' : '0',
-        "address": address.join(' '),
-        "comment": itemObj.attr('comment') == '' ? '' : itemObj.attr('comment'),
-        "note": itemObj.attr('note') == '' ? '' : itemObj.attr('note'),
-        "type": 'user'
-    };
-
-    return newUser;
-}
+function circleUpdateUser_Item_User(itemObj, currUser) {
+    var address = [];
+    address.push(itemObj.attr('country') == '' ? 'China' : itemObj.attr('country'));
+    address.push(itemObj.attr('state') == '' ? '' : itemObj.attr('state'));
+    address.push(itemObj.attr('city') == '' ? '' : itemObj.attr('city'));
+    address.push(itemObj.attr('schoolmap') == '' ? '' : itemObj.attr('schoolmap'));
+    currUser["userName"] = itemObj.attr('nickname') == '' ? currUser["userId"] : itemObj.attr('nickname'),
+    currUser["header"] = itemObj.attr('header') == '' ? 'image/tmpheader.jpg' : itemObj.attr('header'),
+    //newUser["userId"] = itemObj.attr('uid'),
+    //newUser["msg"] = typeof itemObj.attr('msg') == 'undefined' ? '' : itemObj.attr('msg'),
+    currUser["accecpt"] = itemObj.attr('accecpt') == '1' ? true : false,
+    currUser["gender"] = itemObj.attr('sex') == '1' ? '1' : '0',
+    currUser["address"] = address.join(' '),
+    currUser["comment"] = typeof itemObj.attr('comment') == 'undefined' ? '' : itemObj.attr('comment'),
+    currUser["note"] = typeof itemObj.attr('note') == 'undefined' ? '' : itemObj.attr('note'),
+    //newUser["type"] = 'user',
+    currUser["requestid"] = ''
+};
 
 function circleInitUser_Item_Group(itemObj) {
     var userItems = itemObj.find('item');
@@ -2929,13 +2993,14 @@ function circleInitUser_Item_Group(itemObj) {
         "header": '',
         "userId": itemObj.attr('uid'),
         "msg": '',
-        "accecpt": '',
+        "accecpt": true,
         "gender": '',
         "address": '',
         "comment": itemObj.attr('comment') == '' ? '' : itemObj.attr('comment'),
         "note": '',
         "board": itemObj.attr('board') == '' ? '' : itemObj.attr('board'),
-        "type": 'group'
+        "type": 'group',
+        "requestid": ''
     };
 
     return newGroup;
@@ -2947,12 +3012,13 @@ function circleInitUser_Item_Channel(itemObj) {
         "header": itemObj.attr('header') == '' ? 'image/tmpheader.jpg' : itemObj.attr('header'),
         "userId": itemObj.attr('uid'),
         "msg": '',
-        "accecpt": '',
+        "accecpt": true,
         "gender": '',
         "address": '',
         "comment": itemObj.attr('comment') == '' ? '' : itemObj.attr('comment'),
         "note": '',
-        "type": 'channel'
+        "type": 'channel',
+        "requestid": ''
     };
 
     return newChannel;
@@ -4139,46 +4205,48 @@ function initData() {
             _CookieUtils.set("logined_user_nickname", _gUserInfoObj.nickName);
         }
 
-        var headerFn = function (response_header) {
-            var success_header = ($($(response_header).find('executed')[0]).text() == 'true' ? true : false);
-            if (success_header) {
-                var tmpImg = $($(response_header).find('msg')[0]).text();
-                var tmpFile = tmpImg.split('/');
-                tmpFile = tmpFile[tmpFile.length - 1];
-                if (tmpFile.indexOf('.') < 0) {
-                    tmpImg = 'image/tmpheader.jpg';
-                }
-
-                _gUserInfoObj.header = tmpImg;
-            } else {
-                _gUserInfoObj.header = 'image/tmpheader.jpg';
+        var levelFn = function (levelResponse) {
+            _gUserInfoObj.level = $($(levelResponse).find('root')[0]).text();
+            if (_gUserInfoObj.level == '') {
+                _gUserInfoObj.level = '初级程序员';
             }
 
-            _CookieUtils.set("logined_user_header", _gUserInfoObj.header);
-            updateUserInfo();
-            var checkOnFn = function (response_checkon) {
-                var success = ($($(response_checkon).find('executed')[0]).text() == 'true' ? true : false);
-                if (success) {
-                    $('#btn_Student_SignIn .mood-text').text('已签到');
+            var headerFn = function (response_header) {
+                var success_header = ($($(response_header).find('executed')[0]).text() == 'true' ? true : false);
+                if (success_header) {
+                    var tmpImg = $($(response_header).find('msg')[0]).text();
+                    var tmpFile = tmpImg.split('/');
+                    tmpFile = tmpFile[tmpFile.length - 1];
+                    if (tmpFile.indexOf('.') < 0) {
+                        tmpImg = 'image/tmpheader.jpg';
+                    }
+
+                    _gUserInfoObj.header = tmpImg;
+                } else {
+                    _gUserInfoObj.header = 'image/tmpheader.jpg';
                 }
-            };
 
-            ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getcheckon, {}), '', checkOnFn);
-        }
+                _CookieUtils.set("logined_user_header", _gUserInfoObj.header);
+                updateUserInfo();
+                var checkOnFn = function (response_checkon) {
+                    var success = ($($(response_checkon).find('executed')[0]).text() == 'true' ? true : false);
+                    if (success) {
+                        $('#btn_Student_SignIn .mood-text').text('已签到');
+                    }
+                };
 
-        ajaxFn('GET', _getRequestURL(_gURLMapping.account.getheader, {}), '', headerFn);
-        //ajaxFn('GET', _getRequestURL(_gURLMapping.account.getCircleNews, {}), '', function () {
-        //    var success = ($($(response).find('executed')[0]).text() == 'true' ? true : false);
-        //    if (success) {
-        //        updateCircleNews();
-        //    }
-        //});
+                ajaxFn('GET', _getRequestURL(_gURLMapping.profile.getcheckon, {}), '', checkOnFn);
+            }
+
+            ajaxFn('GET', _getRequestURL(_gURLMapping.account.getheader, {}), '', headerFn);
+        };
+
+        ajaxFn('GET', _getRequestURL(_gURLMapping.profile.gettitle, {}), '', levelFn);
         buildCategoryContent();
         hideLoadingMask();
     };
 
     ajaxFn('GET', _getRequestURL(_gURLMapping.account.getinfo, {}), '', successFn);
-    //initFriendsForTest();
 };
 
 function updateUserInfo() {
@@ -4634,7 +4702,6 @@ function getCircleToken() {
     var actionFn = function (response) {
         var actions = $(response).find('item');
         if (actions.length > 0) {
-            _gToken = '';
             webSocketCreate();
         } else {
 
@@ -4649,7 +4716,7 @@ function webSocketCreate() {
     _gSocket = new WebSocket("WS://www.ikcoder.com/corebasic?student_token=" + _CookieUtils.get('student_token'));
     //建立websocket连接成功
     _gSocket.onopen = function () {
-        webSocketSend('Action_Get_DialogList', '', '', [], {});
+        //webSocketSend('Action_Get_DialogList', '', '', [], {});
     };
 
     //接收服务端数据时
@@ -4697,7 +4764,6 @@ function webSocketSend(act, iSymbol, iMsg, iTargets, iValue, iBatch) {
     tmpMsg.push(act);
     tmpMsg.push('</action>');
     tmpMsg.push(value);
-    tmpMsg.push('<params>');
     if (targets.length > 0) {
         tmpMsg.push('<target>');
         for (var i = 0; i < targets.length; i++) {
@@ -4715,7 +4781,7 @@ function webSocketSend(act, iSymbol, iMsg, iTargets, iValue, iBatch) {
         tmpMsg.push('</message>');
     }
 
-
+    tmpMsg.push('<params>');
     if (batch.length > 0) {
         for (var i = 0; i < batch.length; i++) {
             tmpMsg.push('<item>');
@@ -4743,8 +4809,8 @@ function webSocketClose() {
     _gSocket.close();
 };
 
-function initBatchProfileArr(doc) {
-    //<root><row id="3" puname="13111111111" suname="13133333333" accepted="0"></row></root>
+function getUesrIdArrFromNewFriendDoc(doc) {
+    //<root><row index="1" id="8" puname="13122222222" suname="13111111111" isacc="0" message="hello"></root>
     var tmpArr = [];
     var items = doc.find('row');
     var itemObj = null;
@@ -4759,6 +4825,31 @@ function initBatchProfileArr(doc) {
 
     return tmpArr;
 };
+
+function circleCheckUnexistNewFriend(doc) {
+    var tmpArr = [];
+    var items = doc.find('row');
+    var itemObj = null;
+    var userId, exist;
+    for (var i = 0; i < items.length; i++) {
+        itemObj = $(items[i]);
+        userId = itemObj.attr('puname');
+        exist = false;
+        for (var j = 0; j < _gCircleUsers.length; j++) {
+            if (_gCircleUsers[j].userId == userId && _gCircleUsers[j].userName != '') {
+                exist = true;
+                break;
+            }
+        }
+
+        if (!exist) {
+            circleCreateAddNewFriend(itemObj);
+            tmpArr.push(userId);
+        }
+    }
+
+    return tmpArr;
+}
 
 function webSocketReceiveCircle(evt) {
     //<ret><faction>Action_Get_RelationsSearch</faction><doc></doc></ret>
@@ -4783,7 +4874,7 @@ function webSocketReceiveCircle(evt) {
                 webSocketSend('Action_Get_RelationsList', '', '', [], {});
             } else {
                 if (addressItem.hasClass('active')) {
-                    webSocketSend('Action_Get_BatchArrProfile', '', '', [], {}, initBatchProfileArr(valDoc));
+                    webSocketSend('Action_Get_BatchArrProfile', '', '', [], {}, getUesrIdArrFromNewFriendDoc(valDoc));
                 } else {
                     addressAlert.text('').show();
                 }
@@ -4795,7 +4886,12 @@ function webSocketReceiveCircle(evt) {
                 webSocketSend('Action_Get_RelationsAcceptableList', '', '', [], {});
             } else {
                 if (newFriendItem.hasClass('active')) {
-                    circleBuildNewFriendsList(valDoc);
+                    var tmpArr = circleCheckUnexistNewFriend(valDoc);
+                    if (tmpArr.length > 0) {
+                        webSocketSend('Action_Get_BatchArrProfile', '', '', [], {}, tmpArr);
+                    } else {
+                        circleBuildNewFriendsList();
+                    }
                 } else {
                     var newCount = valDoc.find('row').length;
                     var tmpCount = newFriendAlert.text() == '' ? 0 : parseInt(newFriendAlert.text());
@@ -4806,14 +4902,28 @@ function webSocketReceiveCircle(evt) {
                 }
             }
             break;
+        case 'Action_Get_DialogList':
+            circleInitChats(valDoc);
+            break;
+        case 'Action_Get_DialogContent':
+            webSocketFormatMsg(valDoc);
+            break;
+        case 'Action_Set_NewDialog':
+
+            break;
         case 'Action_Get_BatchArrProfile':
             circleUpdateUserList(valDoc, 'user');
             switch (_gCurrentAction) {
                 case 'Action_Get_RelationsList':
                     circleBuildSection_Address();
                     break;
+                case 'Action_Get_RelationsAcceptableList':
+                    circleBuildNewFriendsList();
+                    break;
             }
 
+            break;
+        default:
             break;
     }
 
@@ -4825,11 +4935,11 @@ function webSocketReceiveCircle(evt) {
         $('.category-item-attr.circle-attr').show();
     }
 
-    if (typeof _gCirleMessages[receiveObj.symbol] == undefined || !$.isArray(_gCirleMessages[receiveObj.symbol])) {
-        _gCirleMessages[receiveObj.symbol] = [];
+    if (typeof _gCircleChats[receiveObj.symbol] == undefined || !$.isArray(_gCircleChats[receiveObj.symbol])) {
+        _gCircleChats[receiveObj.symbol] = [];
     }
 
-    var targetMsgs = _gCirleMessages[receiveObj.symbol];
+    var targetMsgs = _gCircleChats[receiveObj.symbol];
     var targetUserEl = $('.row-circle-user-list-item[data-target="' + receiveObj.symbol + '"]');
     var targetUserObj = circleGetUserObj(receiveObj.symbol);
     if (targetUserEl.length == 0) {
@@ -4865,34 +4975,24 @@ function webSocketReceiveCircle(evt) {
     }
 };
 
-function webSocketFormatMsg(msgs) {
-    //{ type: 'new', items: [{ user: { type: 'system', id: 1 }, msg: 'aaaaa' }] }
-    var userSymbol = msgs.userType + '|' + msgs.userId;
-    if (typeof _gCirleMessages[userSymbol] == 'undefined' || !$.isArray(_gCirleMessages[userSymbol])) {
-        _gCirleMessages[userSymbol] = [];
-    }
+function webSocketFormatMsg(doc) {
 
-    var tmpItem = null;
-    var newItems = [];
-    for (var i = 0; i < msgs.msg.length; i++) {
-        tmpItem = { type: -1, content: 'Apply a CSS fade transition to the popover' };
-        _gCirleMessages[userSymbol].push(tmpItem);
-        newItems.push(tmpItem);
-    }
-
-    return { type: 'list', symbol: userSymbol, items: newItems };
 };
+
+
+
+
 
 function initFriendsForTest() {
     var names = ["淳芸", "orion-01", "唐宏禹", "穆晓晨", "张欢引", "吴琼", "吴东鹏", "黄少铅", "胡运燕", "刘幸", "陈媛媛", "李大鹏", "旷东林"];
     var shortAccount = ["chunyun", "orion-01", "tanghongyu", "mUXIAOCHEN", "zhanghuanyin", "wuqiong", "wudongpeng", "huangshaoqian", "yunyan", "liuxing", "CHENYUANYUAN", "dapeng", "kuangdonglin"];
     _circleDataSearch = { value: [] };
-    _gCiecleUsers = [{
+    _gCircleUsers = [{
         userName: '系统消息',
         header: 'image/tmpheader.jpg',
         userId: '-1',
         "msg": '',
-        "accecpt": 1,
+        "accecpt": true,
         "gender": '',
         "address": '',
         "comment": '系统消息和通知',
@@ -4915,11 +5015,11 @@ function initFriendsForTest() {
         };
 
         _circleDataSearch.value.push(newUser);
-        _gCiecleUsers.push(newUser);
+        _gCircleUsers.push(newUser);
     }
 
-    _gCiecleUsers = _gCiecleUsers.concat(initGroupForTest());
-    _gCiecleUsers = _gCiecleUsers.concat(initChannelForTest());
+    _gCircleUsers = _gCircleUsers.concat(initGroupForTest());
+    _gCircleUsers = _gCircleUsers.concat(initChannelForTest());
 };
 
 function initNewFriendsForTest() {
@@ -5048,10 +5148,10 @@ function testswebSocketGetCiecleHistory(userSymbol, userType) {
     var currUserObj = circleGetUserObj(userSymbol, userType);
     var targetUserNoteEl = $('.row-circle-user-list-item[data-target="' + userSymbol + '"] .col-circle-user-list-item-msg .circle-user-list-item-msg');
     var newMsgItem;
-    _gCirleMessages[userSymbol] = [];
+    _gCircleChats[userSymbol] = [];
     for (var i = 0; i < tmpDatas.length; i++) {
         newMsgItem = circleBuildMessageItem(tmpDatas[i].content, tmpDatas[i].type, (tmpDatas[i].type == -1 ? targetUserObj : _gUserInfoObj));
-        _gCirleMessages[userSymbol].push(newMsgItem);
+        _gCircleChats[userSymbol].push(newMsgItem);
     }
 
     circleUpdateMsgHistory(userSymbol, userType);
@@ -5060,75 +5160,3 @@ function testswebSocketGetCiecleHistory(userSymbol, userType) {
 $(window).on('unload', function () {
     webSocketClose();
 });
-
-/*
-* <root>
-* <from>
-* token
-* </from>
-* <target>
-* <item>
-* u1
-* </item>
-* <item>
-* u2
-* </item>
-* </target>
-* <action>
-* Action_Set_NewDialog
-* </action>
-* </root>
-///*
-//* <root>
-//* <from>
-//* token
-//* <from>
-//* <action>
-//* Action_Get_ActiveDialog
-//* </action>
-//* </root>
-//*                   
-// */
-//* <root>
-//* <from>
-//* token
-//* </from>
-//* <target>
-//* <item>
-//* u1
-//* </item>
-//* <item>
-//* u2
-//* </item>
-//* </target>
-//* <action>
-//* Action_Get_DialogContent
-//* </action>
-//* </root>
-//* 
-///*
-//* <root>
-//* <from>
-//* token
-//* </from>
-//* <symbol>
-//* symbol for message
-//* </symbol>
-//* <action>
-//* Action_Set_OpenDialog
-//* </action>
-//* <params>
-//* <target>
-//* <item>
-//* u1
-//* </item>
-//* <item>
-//* u2
-//* </item>
-//* </target>
-//* <message>
-//* </message>
-//* </params>
-//* </root>
-//* 
-// */
