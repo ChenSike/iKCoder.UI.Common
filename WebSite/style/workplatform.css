@@ -1028,7 +1028,7 @@ body {
 }
 
 #modalFinishLesson{
-
+    z-index: 1080;
 }
 
 #modalFinishLesson .modal-dialog .modal-content{
